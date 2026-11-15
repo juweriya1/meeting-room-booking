@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { getTimezoneDisplayInfo } from '../types';
 import {
   CANONICAL_TIMEZONES,
-  getFormattedOffset,
+  getOffsetMinutes,
+  formatOffsetString,
   type CanonicalTimezone,
 } from '../canonicalTimezones';
 
@@ -12,7 +13,8 @@ interface Props {
 }
 
 interface EnrichedZone extends CanonicalTimezone {
-  offset: string;
+  mins: number;
+  offsetStr: string;
 }
 
 export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: Props) {
@@ -26,11 +28,15 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
     []
   );
 
-  const enrichedZones = useMemo<EnrichedZone[]>(() => {
-    return CANONICAL_TIMEZONES.map((zone) => ({
-      ...zone,
-      offset: getFormattedOffset(zone.iana),
-    }));
+  const sortedZones = useMemo<EnrichedZone[]>(() => {
+    return CANONICAL_TIMEZONES.map((zone) => {
+      const mins = getOffsetMinutes(zone.iana);
+      return {
+        ...zone,
+        mins,
+        offsetStr: formatOffsetString(mins),
+      };
+    }).sort((a, b) => a.mins - b.mins);
   }, []);
 
   const currentInfo = useMemo(
@@ -60,15 +66,15 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
 
   const filteredZones = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return enrichedZones;
-    return enrichedZones.filter(
+    if (!q) return sortedZones;
+    return sortedZones.filter(
       (z) =>
-        z.region.toLowerCase().includes(q) ||
+        z.label.toLowerCase().includes(q) ||
         z.cities.toLowerCase().includes(q) ||
         z.iana.toLowerCase().includes(q) ||
-        z.offset.toLowerCase().includes(q)
+        z.offsetStr.toLowerCase().includes(q)
     );
-  }, [search, enrichedZones]);
+  }, [search, sortedZones]);
 
   const handleSelect = (tz: string) => {
     onSelectTimeZone(tz);
@@ -76,7 +82,12 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
     setSearch('');
   };
 
-  const renderZoneRow = (iana: string, title: string, subtitle?: string, offset?: string) => {
+  const renderZoneRow = (
+    iana: string,
+    offsetDisplay: string,
+    title: string,
+    subtitle?: string
+  ) => {
     const isSelected = iana === currentTimeZone;
     return (
       <div
@@ -97,21 +108,21 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
         onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? '#eff6ff' : 'transparent')}
       >
         <div style={{ flex: 1, minWidth: 0, paddingRight: '.5rem' }}>
-          <div style={{ fontWeight: isSelected ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {title}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '.8rem', color: 'var(--muted)' }}>
+              {offsetDisplay}
+            </span>
+            <span style={{ fontWeight: isSelected ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title}
+            </span>
           </div>
           {subtitle && (
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
               {subtitle}
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexShrink: 0 }}>
-          <span style={{ fontSize: '.78rem', color: 'var(--muted)', fontFamily: 'monospace' }}>
-            {offset || getFormattedOffset(iana)}
-          </span>
-          {isSelected && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
-        </div>
+        {isSelected && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
       </div>
     );
   };
@@ -148,7 +159,7 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
             position: 'absolute',
             top: 'calc(100% + 6px)',
             right: 0,
-            width: '380px',
+            width: '400px',
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
@@ -164,7 +175,7 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="🔍 Search city, country, or timezone (e.g. Cairo, Tokyo)..."
+              placeholder="🔍 Search any city, country, or offset (e.g. Cairo, Munich, Doha)..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -180,32 +191,44 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
           </div>
 
           {/* Timezone List */}
-          <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '.3rem 0' }}>
+          <div style={{ maxHeight: '340px', overflowY: 'auto', padding: '.3rem 0' }}>
             {search.trim() ? (
               filteredZones.length > 0 ? (
                 filteredZones.map((z) =>
-                  renderZoneRow(z.iana, `${z.offset} ${z.region}`, z.cities, z.offset)
+                  renderZoneRow(z.iana, z.offsetStr, z.label, z.cities)
                 )
               ) : (
                 <div style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--muted)', fontSize: '.85rem' }}>
-                  No timezones found for "{search}"
+                  No timezones matching "{search}"
                 </div>
               )
             ) : (
               <>
-                {/* Quick Select Section */}
+                {/* Quick Select */}
                 <div style={{ padding: '.35rem .85rem .2rem', fontSize: '.72rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.03em' }}>
                   Quick Select
                 </div>
-                {renderZoneRow(localTz, `Your Local Time (${localTz.replace(/_/g, ' ')})`, 'Detected from browser')}
-                {localTz !== 'UTC' && renderZoneRow('UTC', 'Coordinated Universal Time (UTC)', 'Zulu / GMT baseline', '(GMT+00:00)')}
+                {renderZoneRow(
+                  localTz,
+                  formatOffsetString(getOffsetMinutes(localTz)),
+                  `Your Local Time (${localTz.replace(/_/g, ' ')})`,
+                  'Detected from browser'
+                )}
+                {localTz !== 'UTC' && (
+                  renderZoneRow(
+                    'UTC',
+                    'UTC+00:00',
+                    'Coordinated Universal Time (UTC)',
+                    'Baseline Zulu / GMT'
+                  )
+                )}
 
-                {/* World Canonical Timezones */}
+                {/* World Offsets */}
                 <div style={{ padding: '.55rem .85rem .2rem', fontSize: '.72rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.03em', borderTop: '1px solid var(--border)', marginTop: '.3rem' }}>
-                  Standard World Timezones
+                  World Timezones (36 Offsets)
                 </div>
                 {filteredZones.map((z) =>
-                  renderZoneRow(z.iana, `${z.offset} ${z.region}`, z.cities, z.offset)
+                  renderZoneRow(z.iana, z.offsetStr, z.label, z.cities)
                 )}
               </>
             )}
