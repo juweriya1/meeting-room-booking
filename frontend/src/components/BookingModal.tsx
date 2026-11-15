@@ -196,7 +196,7 @@ export default function BookingModal({
   };
 
   const field = (label: string, name: keyof FormState, type = 'text', step?: string, min?: string) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', minWidth: 0, width: '100%' }}>
       <label style={{ fontSize: '.84rem', fontWeight: 600, color: 'var(--text)' }}>{label}</label>
       <input
         name={name}
@@ -206,10 +206,14 @@ export default function BookingModal({
         value={form[name]}
         onChange={handleChange}
         style={{
-          borderColor: fieldErrors[name] ? 'var(--danger)' : undefined,
-          background: 'var(--bg)',
-          padding: '.5rem .75rem',
-          fontSize: '.88rem',
+          borderColor: fieldErrors[name] ? 'var(--danger)' : '#cbd5e1',
+          background: '#f8fafc',
+          padding: '.6rem .85rem',
+          fontSize: '.9rem',
+          borderRadius: '12px',
+          boxSizing: 'border-box',
+          width: '100%',
+          maxWidth: '100%',
         }}
       />
       {fieldErrors[name] && <span style={{ color: 'var(--danger)', fontSize: '.8rem' }}>{fieldErrors[name]}</span>}
@@ -217,65 +221,90 @@ export default function BookingModal({
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ background: 'var(--surface)', borderRadius: '12px', padding: '1.6rem', width: '100%', maxWidth: '480px', boxShadow: '0 24px 64px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border)' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
+      <div style={{ background: 'var(--surface)', borderRadius: '20px', padding: '1.75rem', width: '100%', maxWidth: '500px', boxShadow: '0 25px 60px -15px rgba(0,0,0,.25)', display: 'flex', flexDirection: 'column', gap: '1.1rem', border: '1px solid rgba(226, 232, 240, 0.9)', boxSizing: 'border-box', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Book a Room</h2>
-          <button className="btn-ghost" style={{ padding: '.2rem .5rem', fontSize: '.9rem' }} onClick={onClose}>✕</button>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.01em' }}>Book a Room</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '1px solid var(--border)',
+              background: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--muted)',
+              fontSize: '.9rem',
+              transition: 'background .15s ease',
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        {roomErr && <div className="error-banner">⚠️ {roomErr}</div>}
+        {roomErr && <div className="error-banner" style={{ borderRadius: '12px' }}>⚠️ {roomErr}</div>}
         {room && (
-          <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', fontSize: '.88rem', border: '1px solid var(--border)' }}>
-            <strong>{room.name}</strong> &nbsp;·&nbsp; 📍 {room.location} &nbsp;·&nbsp; 👥 {room.capacity} seats
+          <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '.85rem 1rem', fontSize: '.88rem', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.4rem' }}>
+            <div>
+              <strong style={{ fontSize: '.95rem' }}>{room.name}</strong>
+              <span style={{ color: 'var(--muted)', marginLeft: '.5rem' }}>📍 {room.location}</span>
+            </div>
+            <span style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '999px', padding: '.2rem .65rem', fontSize: '.75rem', fontWeight: 600 }}>
+              👥 {room.capacity} seats
+            </span>
           </div>
         )}
 
         {apiError?.status === 409 && (
-          <div className="error-banner" style={{ fontWeight: 600 }}>
+          <div className="error-banner" style={{ fontWeight: 600, borderRadius: '12px' }}>
             🚫 Conflict: {apiError.detail}
           </div>
         )}
 
         {apiError && apiError.status !== 409 && (
-          <div className="error-banner">⚠️ {apiError.detail}</div>
+          <div className="error-banner" style={{ borderRadius: '12px' }}>⚠️ {apiError.detail}</div>
         )}
 
         {success ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', padding: '1rem 0' }}>
-            <div style={{ fontSize: '2rem' }}>✅</div>
-            <div style={{ fontWeight: 600 }}>Booking confirmed!</div>
-            <button className="btn-primary" onClick={onClose}>Close</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', padding: '1.5rem 0' }}>
+            <div style={{ fontSize: '2.5rem' }}>✅</div>
+            <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>Booking confirmed!</div>
+            <button className="btn-primary" style={{ borderRadius: '12px', padding: '.6rem 1.5rem' }} onClick={onClose}>Close</button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.9rem' }} noValidate>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.95rem' }} noValidate>
             {field('👤 Your Name', 'customer_name')}
             {field('✉️ Your Email', 'customer_email', 'email')}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
-              {field('🕒 Start Time', 'start_time', 'datetime-local', '900', defaultTimes.start)}
-              {field('🕒 End Time', 'end_time', 'datetime-local', '900', form.start_time || defaultTimes.start)}
-            </div>
+            {/* Stacked Start & End Time full-width to prevent any spill */}
+            {field('🕒 Start Time', 'start_time', 'datetime-local', '900', defaultTimes.start)}
+            {field('🕒 End Time', 'end_time', 'datetime-local', '900', form.start_time || defaultTimes.start)}
 
-            <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 500 }}>Quick duration:</span>
+            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '.78rem', color: 'var(--muted)', fontWeight: 600 }}>Quick duration:</span>
               {[15, 30, 45, 60, 90, 120].map((m) => {
                 const isActive = currentDurationMins === m;
                 return (
                   <button
                     key={m}
                     type="button"
-                    className="btn-ghost"
                     onClick={() => setDurationMinutes(m)}
                     style={{
-                      fontSize: '.72rem',
-                      padding: '.15rem .5rem',
-                      borderRadius: '12px',
-                      background: isActive ? 'var(--primary)' : 'transparent',
+                      fontSize: '.75rem',
+                      padding: '.25rem .65rem',
+                      borderRadius: '999px',
+                      background: isActive ? 'var(--primary)' : '#f1f5f9',
                       color: isActive ? '#ffffff' : 'var(--text)',
-                      borderColor: isActive ? 'var(--primary)' : 'var(--border)',
-                      fontWeight: isActive ? 600 : 400,
+                      border: isActive ? '1px solid var(--primary)' : '1px solid #e2e8f0',
+                      fontWeight: isActive ? 600 : 500,
+                      cursor: 'pointer',
                       transition: 'all .15s ease',
+                      boxShadow: isActive ? '0 2px 6px rgba(37, 99, 235, 0.3)' : 'none',
                     }}
                   >
                     {m < 60 ? `${m}m` : m === 60 ? '1h' : `${m / 60}h`}
@@ -284,13 +313,40 @@ export default function BookingModal({
               })}
             </div>
 
-            <div style={{ fontSize: '.78rem', color: 'var(--muted)', background: 'var(--bg)', padding: '.45rem .75rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '.78rem', color: '#475569', background: 'rgba(37, 99, 235, 0.05)', padding: '.65rem .9rem', borderRadius: '12px', border: '1px solid rgba(37, 99, 235, 0.15)' }}>
               🌐 Times are entered in <strong>{getTimezoneDisplayInfo(activeTz).label}</strong> and stored in UTC.
             </div>
 
-            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.25rem' }}>
-              <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={submitting}>
+            <div style={{ display: 'flex', gap: '.65rem', justifyContent: 'flex-end', marginTop: '.35rem' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  padding: '.55rem 1.15rem',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  color: '#475569',
+                  fontWeight: 500,
+                  fontSize: '.88rem',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  padding: '.55rem 1.35rem',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '.88rem',
+                  boxShadow: '0 3px 10px rgba(37, 99, 235, 0.3)',
+                  border: 'none',
+                }}
+              >
                 {submitting ? <><span className="spinner" /> Booking…</> : 'Confirm Booking'}
               </button>
             </div>
