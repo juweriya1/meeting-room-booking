@@ -1,5 +1,7 @@
 /** Shared TypeScript interfaces matching the backend serializer output. */
 
+import { getOffsetMinutes, formatOffsetString } from './canonicalTimezones';
+
 export interface Room {
   id: number;
   name: string;
@@ -33,12 +35,8 @@ export interface ApiError {
 
 export function getTimezoneDisplayInfo(tz: string): { city: string; offset: string; label: string } {
   try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      timeZoneName: 'shortOffset',
-    });
-    const parts = formatter.formatToParts(new Date());
-    const offset = parts.find((p) => p.type === 'timeZoneName')?.value || '';
+    const mins = getOffsetMinutes(tz);
+    const offset = formatOffsetString(mins);
     const city = tz === 'UTC' ? 'UTC' : (tz.replace(/_/g, ' ').split('/').pop() || tz);
     return { city, offset, label: `${city} (${offset})` };
   } catch {

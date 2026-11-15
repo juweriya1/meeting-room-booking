@@ -160,6 +160,7 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
             top: 'calc(100% + 6px)',
             right: 0,
             width: '400px',
+            maxWidth: 'calc(100vw - 2rem)',
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
@@ -171,7 +172,7 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
           }}
         >
           {/* Search Box */}
-          <div style={{ padding: '.6rem .75rem', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div style={{ padding: '.6rem .75rem', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
               ref={searchInputRef}
               type="text"
@@ -181,13 +182,32 @@ export default function TimezoneSelector({ currentTimeZone, onSelectTimeZone }: 
               style={{
                 width: '100%',
                 fontSize: '.85rem',
-                padding: '.4rem .65rem',
+                padding: search ? '.4rem 1.8rem .4rem .65rem' : '.4rem .65rem',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
                 background: 'var(--surface)',
                 outline: 'none',
               }}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: '1.2rem',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '.85rem',
+                  color: 'var(--muted)',
+                  padding: '0 .2rem',
+                }}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Timezone List */}

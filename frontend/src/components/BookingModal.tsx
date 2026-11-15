@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchRoom, createBooking } from '../api';
-import { parseDateTimeInZone } from '../types';
+import { parseDateTimeInZone, getTimezoneDisplayInfo } from '../types';
 import type { Room, Booking, ApiError } from '../types';
 
 interface Props {
@@ -147,7 +147,7 @@ export default function BookingModal({ roomId, onClose, onBookingCreated, timeZo
             {field('Start Time', 'start_time', 'datetime-local')}
             {field('End Time', 'end_time', 'datetime-local')}
             <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>
-              🌐 Times are entered in <strong>{activeTz}</strong> and stored in UTC.
+              🌐 Times are entered in <strong>{getTimezoneDisplayInfo(activeTz).label}</strong> and stored in UTC.
             </div>
             <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.25rem' }}>
               <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>

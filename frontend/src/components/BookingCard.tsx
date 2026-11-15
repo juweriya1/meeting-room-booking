@@ -21,7 +21,7 @@ function fmtDateTime(startIso: string, endIso: string, timeZone?: string): strin
   if (sDate === eDate) {
     return `${sDate}, ${sTime} – ${eTime}`;
   }
-  return `${sDate} ${sTime} – ${eDate} ${eTime}`;
+  return `${sDate}, ${sTime} – ${eDate}, ${eTime}`;
 }
 
 export default function BookingCard({ booking, onCancelled, timeZone }: Props) {
