@@ -113,8 +113,11 @@ class BookingConcurrencyTests(APITransactionTestCase):
         payload = self._payload(14, 15, days_ahead=2)
 
         def fire():
+            from django.db import connection
             client = APIClient()
-            return client.post(self.base_url, payload, format="json").status_code
+            result = client.post(self.base_url, payload, format="json").status_code
+            connection.close()  # release thread-local DB connection so teardown can DROP DATABASE
+            return result
 
         with ThreadPoolExecutor(max_workers=3) as executor:
             results = [f.result() for f in as_completed([executor.submit(fire) for _ in range(3)])]
