@@ -76,3 +76,33 @@ export function parseDateTimeInZone(dateTimeStr: string, timeZone: string): stri
   }
   return new Date(guess).toISOString();
 }
+
+/**
+ * Returns a date rounded up to the next clean 15-minute boundary in the future (:00, :15, :30, :45).
+ */
+export function getNextQuarterHour(date: Date = new Date()): Date {
+  const ms = 1000 * 60 * 15;
+  const rounded = Math.ceil(date.getTime() / ms) * ms;
+  return new Date(rounded === date.getTime() ? rounded + ms : rounded);
+}
+
+/**
+ * Formats a Date into 'YYYY-MM-DDTHH:MM' in the specified timezone for HTML datetime-local inputs.
+ */
+export function formatDateTimeInZone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const p: Record<string, string> = {};
+  for (const part of parts) p[part.type] = part.value;
+  let h = p.hour;
+  if (h === '24') h = '00';
+  return `${p.year}-${p.month}-${p.day}T${h}:${p.minute}`;
+}

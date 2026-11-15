@@ -83,6 +83,59 @@ class BookingBusinessRuleTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    # Test 7: Booking duration < 15 minutes → 400
+    def test_minimum_duration_15_minutes_rejected(self):
+        response = self.client.post(
+            self.base_url,
+            self._payload(10, 10, start_minute=0, end_minute=10),  # 10 minutes
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("at least 15 minutes", str(response.data))
+
+    # Test 8: Booking duration = 15 minutes (aligned) → 201
+    def test_minimum_duration_15_minutes_accepted(self):
+        response = self.client.post(
+            self.base_url,
+            self._payload(10, 10, start_minute=0, end_minute=15),  # 15 minutes
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # Test 9: Unaligned start time (e.g. 10:07) → 400
+    def test_unaligned_start_time_rejected(self):
+        response = self.client.post(
+            self.base_url,
+            self._payload(10, 11, start_minute=7, end_minute=0),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("15-minute boundary", str(response.data))
+
+    # Test 10: Unaligned end time (e.g. 11:23) → 400
+    def test_unaligned_end_time_rejected(self):
+        response = self.client.post(
+            self.base_url,
+            self._payload(10, 11, start_minute=0, end_minute=23),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("15-minute boundary", str(response.data))
+
+    # Test 11: Booking duration > 24 hours → 400
+    def test_maximum_duration_exceeded_rejected(self):
+        response = self.client.post(
+            self.base_url,
+            self._payload(10, 11, days_ahead=1),
+            format="json",
+        )
+        # Modify end_time to be 25 hours later
+        payload = self._payload(10, 11, days_ahead=1)
+        payload["end_time"] = (make_dt(10, days_ahead=1) + timedelta(hours=25)).isoformat()
+        response = self.client.post(self.base_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("cannot exceed 24 hours", str(response.data))
+
 
 
 

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.utils import timezone
 from rest_framework import serializers
 from bookings.models import Room, Booking
@@ -34,6 +35,23 @@ class BookingSerializer(serializers.ModelSerializer):
             if start <= timezone.now():
                 raise serializers.ValidationError(
                     {'start_time': 'start_time must be in the future.'}
+                )
+            duration = end - start
+            if duration < timedelta(minutes=15):
+                raise serializers.ValidationError(
+                    {'end_time': 'Booking duration must be at least 15 minutes.'}
+                )
+            if duration > timedelta(hours=24):
+                raise serializers.ValidationError(
+                    {'end_time': 'Booking duration cannot exceed 24 hours.'}
+                )
+            if start.minute % 15 != 0 or start.second != 0 or start.microsecond != 0:
+                raise serializers.ValidationError(
+                    {'start_time': 'Start time must be aligned to a 15-minute boundary (e.g. :00, :15, :30, :45).'}
+                )
+            if end.minute % 15 != 0 or end.second != 0 or end.microsecond != 0:
+                raise serializers.ValidationError(
+                    {'end_time': 'End time must be aligned to a 15-minute boundary (e.g. :00, :15, :30, :45).'}
                 )
         return attrs
 
