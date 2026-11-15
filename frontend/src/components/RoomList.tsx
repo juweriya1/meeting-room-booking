@@ -44,6 +44,7 @@ export default function RoomList({ selectedRoom, onSelectRoom, onBookRoom }: Pro
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search rooms"
+          style={{ fontSize: '.88rem' }}
         />
         <input
           type="number"
@@ -51,7 +52,7 @@ export default function RoomList({ selectedRoom, onSelectRoom, onBookRoom }: Pro
           value={capacity}
           onChange={(e) => setCapacity(e.target.value)}
           aria-label="Seats needed"
-          style={{ width: '130px', flexShrink: 0 }}
+          style={{ width: '145px', flexShrink: 0, fontSize: '.84rem', padding: '.55rem .65rem' }}
           min={1}
         />
       </div>
