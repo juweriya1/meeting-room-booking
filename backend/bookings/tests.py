@@ -51,6 +51,7 @@ class BookingBusinessRuleTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("already booked", str(response.data))
 
     # Test 2: Exact duplicate → 409
     def test_exact_duplicate_rejection(self):
@@ -82,6 +83,7 @@ class BookingBusinessRuleTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("end_time must be strictly after start_time", str(response.data))
 
     # Test 7: Booking duration < 15 minutes → 400
     def test_minimum_duration_15_minutes_rejected(self):
@@ -124,12 +126,6 @@ class BookingBusinessRuleTests(APITestCase):
 
     # Test 11: Booking duration > 24 hours → 400
     def test_maximum_duration_exceeded_rejected(self):
-        response = self.client.post(
-            self.base_url,
-            self._payload(10, 11, days_ahead=1),
-            format="json",
-        )
-        # Modify end_time to be 25 hours later
         payload = self._payload(10, 11, days_ahead=1)
         payload["end_time"] = (make_dt(10, days_ahead=1) + timedelta(hours=25)).isoformat()
         response = self.client.post(self.base_url, payload, format="json")
@@ -180,6 +176,67 @@ class BookingBusinessRuleTests(APITestCase):
         resp2 = self.client.patch(self.cancel_url(booking.pk), format="json")
         self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("already cancelled", str(resp2.data))
+
+    # Test 15: Invalid ?status= parameter is ignored and returns all bookings
+    def test_filter_by_status_invalid_value_ignored(self):
+        confirmed = self._seed_booking(10, 11)
+        cancelled = Booking.objects.create(
+            room=self.room,
+            customer_name="Cancelled User",
+            customer_email="cancelled@example.com",
+            start_time=make_dt(12),
+            end_time=make_dt(13),
+            status=Booking.Status.CANCELLED,
+        )
+        response = self.client.get(f"{self.base_url}?status=invalid_value")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = [b["id"] for b in response.data]
+        self.assertIn(confirmed.id, returned_ids)
+        self.assertIn(cancelled.id, returned_ids)
+
+
+class RoomApiTests(APITestCase):
+
+    def setUp(self):
+        self.room_small = Room.objects.create(name="Alpha", location="Floor 1", capacity=4)
+        self.room_med = Room.objects.create(name="Beta", location="Floor 2", capacity=10)
+        self.room_large = Room.objects.create(name="Gamma", location="Floor 3", capacity=20)
+        self.base_url = "/api/rooms/"
+
+    def test_list_rooms_ordered_by_name(self):
+        response = self.client.get(self.base_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [r["name"] for r in response.data]
+        self.assertEqual(names, ["Alpha", "Beta", "Gamma"])
+
+    def test_search_rooms_case_insensitive(self):
+        response = self.client.get(f"{self.base_url}?search=al")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [r["name"] for r in response.data]
+        self.assertEqual(names, ["Alpha"])
+
+    def test_filter_rooms_by_capacity(self):
+        response = self.client.get(f"{self.base_url}?capacity=10")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [r["name"] for r in response.data]
+        self.assertNotIn("Alpha", names)
+        self.assertIn("Beta", names)
+        self.assertIn("Gamma", names)
+
+    def test_filter_rooms_invalid_capacity_ignored(self):
+        response = self.client.get(f"{self.base_url}?capacity=not_a_number")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+
+    def test_retrieve_room_by_id(self):
+        response = self.client.get(f"{self.base_url}{self.room_small.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "Alpha")
+        self.assertEqual(response.data["capacity"], 4)
+
+    def test_retrieve_room_nonexistent_returns_404(self):
+        response = self.client.get(f"{self.base_url}99999/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 

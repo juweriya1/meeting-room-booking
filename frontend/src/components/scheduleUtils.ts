@@ -1,6 +1,7 @@
 /**
  * Utilities and constants for the Google Calendar-style Day Schedule View.
  */
+import type { Booking } from '../types';
 
 export const TIMELINE_START_HOUR = 0;   // 12:00 AM
 export const TIMELINE_END_HOUR = 24;    // 12:00 AM next day (full 24h)
@@ -53,4 +54,87 @@ export interface DragState {
   roomId: number;
   startMin: number;
   currentMin: number;
+}
+
+export interface RenderedBookingItem {
+  booking: Booking;
+  leftPct: number;
+  widthPct: number;
+  startClock: string;
+  endClock: string;
+  palette: { bg: string; border: string };
+}
+
+export function computeDayBookingsByRoom(
+  bookings: Booking[],
+  selectedDate: string,
+  activeTz: string
+): Map<number, RenderedBookingItem[]> {
+  const map = new Map<number, RenderedBookingItem[]>();
+
+  const getMins = (d: Date) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: activeTz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(d);
+    const p: Record<string, string> = {};
+    parts.forEach((x) => (p[x.type] = x.value));
+    let h = Number(p.hour);
+    if (h === 24) h = 0;
+    return h * 60 + Number(p.minute);
+  };
+
+  const listForDay: Array<{ booking: Booking; startMin: number; endMin: number; s: Date; e: Date }> = [];
+  for (const b of bookings) {
+    if (b.status !== 'confirmed') continue;
+    const s = new Date(b.start_time);
+    const e = new Date(b.end_time);
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: activeTz });
+    const sDate = fmt.format(s);
+    const eDate = fmt.format(e);
+
+    if (eDate < selectedDate || sDate > selectedDate) continue;
+
+    const rawStartMin = sDate < selectedDate ? 0 : getMins(s);
+    const rawEndMin = eDate > selectedDate ? 1440 : getMins(e);
+    const timelineStartMin = TIMELINE_START_HOUR * 60;
+    const timelineEndMin = TIMELINE_END_HOUR * 60;
+    const clampedStart = Math.max(rawStartMin, timelineStartMin);
+    const clampedEnd = Math.min(rawEndMin, timelineEndMin);
+
+    if (clampedEnd <= clampedStart) continue;
+    listForDay.push({ booking: b, startMin: clampedStart, endMin: clampedEnd, s, e });
+  }
+
+  const grouped = new Map<number, typeof listForDay>();
+  for (const item of listForDay) {
+    const l = grouped.get(item.booking.room.id) || [];
+    l.push(item);
+    grouped.set(item.booking.room.id, l);
+  }
+
+  const timelineStartMin = TIMELINE_START_HOUR * 60;
+  for (const [roomId, items] of grouped.entries()) {
+    items.sort((a, b) => a.startMin - b.startMin);
+    const renderedItems = items.map((item, idx) => {
+      const leftPct = ((item.startMin - timelineStartMin) / TOTAL_MINUTES) * 100;
+      const widthPct = ((item.endMin - item.startMin) / TOTAL_MINUTES) * 100;
+      const palette = MEETING_PALETTES[idx % MEETING_PALETTES.length];
+      const timeFmt = (d: Date) =>
+        d.toLocaleTimeString('en-US', { timeZone: activeTz, hour: 'numeric', minute: '2-digit' });
+
+      return {
+        booking: item.booking,
+        leftPct,
+        widthPct,
+        startClock: timeFmt(item.s),
+        endClock: timeFmt(item.e),
+        palette,
+      };
+    });
+    map.set(roomId, renderedItems);
+  }
+  return map;
 }

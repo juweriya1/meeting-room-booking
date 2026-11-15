@@ -1,12 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
-import { fetchRoom, createBooking } from '../api';
-import {
-  parseDateTimeInZone,
-  getTimezoneDisplayInfo,
-  getNextQuarterHour,
-  formatDateTimeInZone,
-} from '../types';
+import { useState, useEffect } from 'react';
+import { fetchRoom } from '../api';
+import { getTimezoneDisplayInfo } from '../types';
 import type { Room, Booking, ApiError } from '../types';
+import { useBookingForm, type FormState } from './useBookingForm';
 
 interface Props {
   roomId: number;
@@ -17,13 +13,6 @@ interface Props {
   timeZone?: string;
 }
 
-interface FormState {
-  customer_name: string;
-  customer_email: string;
-  start_time: string;
-  end_time: string;
-}
-
 export default function BookingModal({
   roomId,
   initialStartTime,
@@ -32,168 +21,33 @@ export default function BookingModal({
   onBookingCreated,
   timeZone,
 }: Props) {
-  const [room, setRoom]           = useState<Room | null>(null);
-  const [roomErr, setRoomErr]     = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Partial<FormState>>({});
-  const [submitting, setSubmitting]   = useState(false);
-  const [apiError, setApiError]       = useState<{ status: number; detail: string } | null>(null);
-  const [success, setSuccess]         = useState(false);
+  const [room, setRoom]       = useState<Room | null>(null);
+  const [roomErr, setRoomErr] = useState<string | null>(null);
 
-  const activeTz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-  // Compute clean initial quarter-hour boundary in active timezone
-  const defaultTimes = useMemo(() => {
-    if (initialStartTime) {
-      if (initialEndTime) {
-        return {
-          start: initialStartTime,
-          end: initialEndTime,
-        };
-      }
-      try {
-        const startUtc = new Date(parseDateTimeInZone(initialStartTime, activeTz));
-        const oneHourLater = new Date(startUtc.getTime() + 60 * 60 * 1000);
-        return {
-          start: initialStartTime,
-          end: formatDateTimeInZone(oneHourLater, activeTz),
-        };
-      } catch {
-        // fallback
-      }
-    }
-    const nextQ = getNextQuarterHour();
-    const oneHourLater = new Date(nextQ.getTime() + 60 * 60 * 1000);
-    return {
-      start: formatDateTimeInZone(nextQ, activeTz),
-      end: formatDateTimeInZone(oneHourLater, activeTz),
-    };
-  }, [initialStartTime, initialEndTime, activeTz]);
-
-  const [form, setForm] = useState<FormState>(() => ({
-    customer_name: '',
-    customer_email: '',
-    start_time: defaultTimes.start,
-    end_time: defaultTimes.end,
-  }));
-
-  const currentDurationMins = useMemo(() => {
-    if (!form.start_time || !form.end_time) return null;
-    try {
-      const s = new Date(parseDateTimeInZone(form.start_time, activeTz)).getTime();
-      const e = new Date(parseDateTimeInZone(form.end_time, activeTz)).getTime();
-      return Math.round((e - s) / (60 * 1000));
-    } catch {
-      return null;
-    }
-  }, [form.start_time, form.end_time, activeTz]);
+  const {
+    form,
+    fieldErrors,
+    submitting,
+    apiError,
+    success,
+    activeTz,
+    currentDurationMins,
+    handleChange,
+    setDurationMinutes,
+    handleSubmit,
+  } = useBookingForm({
+    roomId,
+    initialStartTime,
+    initialEndTime,
+    timeZone,
+    onBookingCreated,
+  });
 
   useEffect(() => {
     fetchRoom(roomId)
       .then(setRoom)
       .catch((e: ApiError) => setRoomErr(e.detail ?? 'Could not load room.'));
   }, [roomId]);
-
-  const validate = (): boolean => {
-    const errs: Partial<FormState> = {};
-    if (!form.customer_name.trim())  errs.customer_name  = 'Name is required.';
-    if (!form.customer_email.trim()) errs.customer_email = 'Email is required.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.customer_email))
-      errs.customer_email = 'Enter a valid email.';
-
-    if (!form.start_time) {
-      errs.start_time = 'Start time is required.';
-    } else {
-      try {
-        const utcStart = parseDateTimeInZone(form.start_time, activeTz);
-        if (new Date(utcStart).getTime() <= Date.now()) {
-          errs.start_time = 'Start time must be in the future.';
-        }
-      } catch {
-        errs.start_time = 'Please enter a valid start time.';
-      }
-    }
-
-    if (!form.end_time) {
-      errs.end_time = 'End time is required.';
-    } else if (form.start_time && form.start_time >= form.end_time) {
-      errs.end_time = 'End time must be strictly after start time.';
-    } else if (form.start_time && form.end_time) {
-      const startMs = new Date(parseDateTimeInZone(form.start_time, activeTz)).getTime();
-      const endMs = new Date(parseDateTimeInZone(form.end_time, activeTz)).getTime();
-      const diffMins = (endMs - startMs) / (1000 * 60);
-
-      if (diffMins < 15) {
-        errs.end_time = 'Booking duration must be at least 15 minutes.';
-      } else if (diffMins > 24 * 60) {
-        errs.end_time = 'Booking duration cannot exceed 24 hours.';
-      }
-
-      const startMin = parseInt(form.start_time.split('T')[1]?.split(':')[1] || '0', 10);
-      const endMin = parseInt(form.end_time.split('T')[1]?.split(':')[1] || '0', 10);
-      if (startMin % 15 !== 0) {
-        errs.start_time = 'Start time must be aligned to a 15-minute interval (:00, :15, :30, :45).';
-      }
-      if (endMin % 15 !== 0) {
-        errs.end_time = 'End time must be aligned to a 15-minute interval (:00, :15, :30, :45).';
-      }
-    }
-    setFieldErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((f) => {
-      const next = { ...f, [name]: value };
-      // Auto-advance end_time if start_time is set to or past existing end_time
-      if (name === 'start_time' && value && next.end_time && value >= next.end_time) {
-        try {
-          const startUtc = new Date(parseDateTimeInZone(value, activeTz));
-          const newEndUtc = new Date(startUtc.getTime() + 60 * 60 * 1000);
-          next.end_time = formatDateTimeInZone(newEndUtc, activeTz);
-        } catch {
-          // ignore
-        }
-      }
-      return next;
-    });
-    setFieldErrors((f) => ({ ...f, [name]: undefined }));
-    setApiError(null);
-  };
-
-  const setDurationMinutes = (mins: number) => {
-    if (!form.start_time) return;
-    try {
-      const startUtc = new Date(parseDateTimeInZone(form.start_time, activeTz));
-      const endUtc = new Date(startUtc.getTime() + mins * 60 * 1000);
-      setForm((f) => ({ ...f, end_time: formatDateTimeInZone(endUtc, activeTz) }));
-      setFieldErrors((f) => ({ ...f, end_time: undefined }));
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setSubmitting(true);
-    setApiError(null);
-    try {
-      const created = await createBooking({
-        room: roomId,
-        customer_name: form.customer_name,
-        customer_email: form.customer_email,
-        start_time: parseDateTimeInZone(form.start_time, activeTz),
-        end_time: parseDateTimeInZone(form.end_time, activeTz),
-      });
-      setSuccess(true);
-      onBookingCreated?.(created);
-    } catch (err) {
-      setApiError(err as ApiError);
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const field = (label: string, name: keyof FormState, type = 'text', step?: string, min?: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', minWidth: 0, width: '100%' }}>
@@ -282,8 +136,8 @@ export default function BookingModal({
             {field('✉️ Your Email', 'customer_email', 'email')}
 
             {/* Stacked Start & End Time full-width to prevent any spill */}
-            {field('🕒 Start Time', 'start_time', 'datetime-local', '900', defaultTimes.start)}
-            {field('🕒 End Time', 'end_time', 'datetime-local', '900', form.start_time || defaultTimes.start)}
+            {field('🕒 Start Time', 'start_time', 'datetime-local', '900')}
+            {field('🕒 End Time', 'end_time', 'datetime-local', '900', form.start_time)}
 
             <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '.78rem', color: 'var(--muted)', fontWeight: 600 }}>Quick duration:</span>

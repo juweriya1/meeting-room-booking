@@ -7,13 +7,14 @@ import {
   TIMELINE_END_HOUR,
   TOTAL_MINUTES,
   HOURS,
-  MEETING_PALETTES,
   format24H,
   formatClockTime,
-  formatDuration,
   getTodayInZone,
+  computeDayBookingsByRoom,
   type DragState,
 } from './scheduleUtils';
+import DayScheduleHeader from './DayScheduleHeader';
+import DayScheduleRow from './DayScheduleRow';
 
 interface Props {
   selectedRoomId?: number | null;
@@ -103,77 +104,10 @@ export default function DayScheduleView({
     }
   }, [selectedDate]);
 
-  const dayBookingsByRoom = useMemo(() => {
-    const map = new Map<number, Array<{
-      booking: Booking;
-      leftPct: number;
-      widthPct: number;
-      startClock: string;
-      endClock: string;
-      palette: { bg: string; border: string };
-    }>>();
-
-    const getMins = (d: Date) => {
-      const parts = new Intl.DateTimeFormat('en-US', { timeZone: activeTz, hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(d);
-      const p: Record<string, string> = {};
-      parts.forEach((x) => (p[x.type] = x.value));
-      let h = Number(p.hour);
-      if (h === 24) h = 0;
-      return h * 60 + Number(p.minute);
-    };
-
-    const listForDay: Array<{ booking: Booking; startMin: number; endMin: number; s: Date; e: Date }> = [];
-    for (const b of bookings) {
-      if (b.status !== 'confirmed') continue;
-      const s = new Date(b.start_time);
-      const e = new Date(b.end_time);
-      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: activeTz });
-      const sDate = fmt.format(s);
-      const eDate = fmt.format(e);
-
-      if (eDate < selectedDate || sDate > selectedDate) continue;
-
-      const rawStartMin = sDate < selectedDate ? 0 : getMins(s);
-      const rawEndMin = eDate > selectedDate ? 1440 : getMins(e);
-      const timelineStartMin = TIMELINE_START_HOUR * 60;
-      const timelineEndMin = TIMELINE_END_HOUR * 60;
-      const clampedStart = Math.max(rawStartMin, timelineStartMin);
-      const clampedEnd = Math.min(rawEndMin, timelineEndMin);
-
-      if (clampedEnd <= clampedStart) continue;
-      listForDay.push({ booking: b, startMin: clampedStart, endMin: clampedEnd, s, e });
-    }
-
-    const grouped = new Map<number, typeof listForDay>();
-    for (const item of listForDay) {
-      const l = grouped.get(item.booking.room.id) || [];
-      l.push(item);
-      grouped.set(item.booking.room.id, l);
-    }
-
-    const timelineStartMin = TIMELINE_START_HOUR * 60;
-    for (const [roomId, items] of grouped.entries()) {
-      items.sort((a, b) => a.startMin - b.startMin);
-      const renderedItems = items.map((item, idx) => {
-        const leftPct = ((item.startMin - timelineStartMin) / TOTAL_MINUTES) * 100;
-        const widthPct = ((item.endMin - item.startMin) / TOTAL_MINUTES) * 100;
-        const palette = MEETING_PALETTES[idx % MEETING_PALETTES.length];
-        const timeFmt = (d: Date) =>
-          d.toLocaleTimeString('en-US', { timeZone: activeTz, hour: 'numeric', minute: '2-digit' });
-
-        return {
-          booking: item.booking,
-          leftPct,
-          widthPct,
-          startClock: timeFmt(item.s),
-          endClock: timeFmt(item.e),
-          palette,
-        };
-      });
-      map.set(roomId, renderedItems);
-    }
-    return map;
-  }, [bookings, selectedDate, activeTz]);
+  const dayBookingsByRoom = useMemo(
+    () => computeDayBookingsByRoom(bookings, selectedDate, activeTz),
+    [bookings, selectedDate, activeTz]
+  );
 
   // Auto-scroll & anchor tracking: focus earliest meeting or current hour in active timezone
   useEffect(() => {
@@ -290,44 +224,16 @@ export default function DayScheduleView({
         if (dragState) handleTrackMouseUp(dragState.roomId);
       }}
     >
-      {/* Date Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.5rem', background: 'var(--surface)', padding: '.6rem .85rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-          <button type="button" className="btn-ghost" style={{ padding: '.2rem .5rem', fontSize: '.8rem' }} onClick={() => shiftDate(-1)}>◀ Prev</button>
-          <button type="button" className="btn-ghost" style={{ padding: '.2rem .5rem', fontSize: '.8rem' }} onClick={() => setSelectedDate(getTodayInZone(activeTz))}>Today</button>
-          <button type="button" className="btn-ghost" style={{ padding: '.2rem .5rem', fontSize: '.8rem' }} onClick={() => shiftDate(1)}>Next ▶</button>
-          <strong style={{ fontSize: '.9rem', marginLeft: '.3rem' }}>{formattedDateTitle}</strong>
-          {totalMeetingsOnDay > 0 && (
-            <span
-              style={{
-                fontSize: '.75rem',
-                color: 'var(--primary)',
-                background: 'rgba(37, 99, 235, 0.08)',
-                border: '1px solid rgba(37, 99, 235, 0.25)',
-                borderRadius: '12px',
-                padding: '2px 8px',
-                fontWeight: 600,
-                marginLeft: '.3rem',
-              }}
-            >
-              {totalMeetingsOnDay} {totalMeetingsOnDay === 1 ? 'meeting' : 'meetings'}
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-            style={{ fontSize: '.8rem', padding: '.2rem .4rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg)' }}
-          />
-          {selectedRoomId != null && onClearRoomFilter && (
-            <button type="button" className="btn-ghost" style={{ fontSize: '.75rem', padding: '.2rem .45rem', color: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={onClearRoomFilter}>
-              ✕ Show All Rooms
-            </button>
-          )}
-        </div>
-      </div>
+      <DayScheduleHeader
+        selectedDate={selectedDate}
+        formattedDateTitle={formattedDateTitle}
+        totalMeetingsOnDay={totalMeetingsOnDay}
+        selectedRoomId={selectedRoomId}
+        onShiftDate={shiftDate}
+        onSetToday={() => setSelectedDate(getTodayInZone(activeTz))}
+        onSelectDate={setSelectedDate}
+        onClearRoomFilter={onClearRoomFilter}
+      />
 
       {loading && <div className="empty-state"><span className="spinner" /> Loading schedule…</div>}
       {!loading && error && <div className="error-banner">⚠️ {error}</div>}
@@ -351,165 +257,21 @@ export default function DayScheduleView({
             </div>
 
             {/* Room Rows with Large Lanes */}
-            {visibleRooms.map((room) => {
-              const bList = dayBookingsByRoom.get(room.id) || [];
-              const isHovered = hoverInfo?.roomId === room.id;
-              const isDragging = dragState?.roomId === room.id;
-
-              let dragLeftPct = 0;
-              let dragWidthPct = 0;
-              let dragDurationText = '';
-              if (isDragging && dragState) {
-                const s = Math.min(dragState.startMin, dragState.currentMin);
-                const e = Math.max(dragState.startMin, dragState.currentMin);
-                dragLeftPct = ((s - TIMELINE_START_HOUR * 60) / TOTAL_MINUTES) * 100;
-                dragWidthPct = Math.max(((e - s) / TOTAL_MINUTES) * 100, 1);
-                dragDurationText = `${formatClockTime(s)} – ${formatClockTime(e)} (${formatDuration(Math.max(e - s, 15))})`;
-              }
-
-              return (
-                <div key={room.id} style={{ display: 'flex', alignItems: 'center', height: '68px' }}>
-                  <div style={{ width: '125px', flexShrink: 0, paddingRight: '.6rem' }}>
-                    <div style={{ fontWeight: 700, fontSize: '.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {room.name}
-                    </div>
-                    <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
-                      👥 {room.capacity} seats
-                    </div>
-                  </div>
-
-                  <div
-                    onMouseMove={(e) => handleTrackMouseMove(e, room.id)}
-                    onMouseDown={(e) => handleTrackMouseDown(e, room.id)}
-                    onMouseLeave={() => setHoverInfo((prev) => (prev?.roomId === room.id ? null : prev))}
-                    style={{
-                      flex: 1,
-                      height: '100%',
-                      position: 'relative',
-                      background: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      cursor: isDragging ? 'col-resize' : 'crosshair',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {/* Background hour gridlines */}
-                    {HOURS.slice(1, -1).map((_, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          bottom: 0,
-                          left: `${((i + 1) / (HOURS.length - 1)) * 100}%`,
-                          borderLeft: '1px dashed rgba(0,0,0,0.08)',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                    ))}
-
-                    {/* Booking Blocks (Large & Alternating Colors) */}
-                    {bList.map(({ booking, leftPct, widthPct, startClock, endClock, palette }) => (
-                      <div
-                        key={booking.id}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        title={`Customer: ${booking.customer_name} (${booking.customer_email})\nTime in ${activeTz}: ${startClock} – ${endClock}\nUTC: ${booking.start_time} to ${booking.end_time}`}
-                        style={{
-                          position: 'absolute',
-                          top: '6px',
-                          bottom: '6px',
-                          left: `${leftPct}%`,
-                          width: `${Math.max(widthPct, 2.5)}%`,
-                          background: palette.bg,
-                          border: `1px solid ${palette.border}`,
-                          color: '#fff',
-                          borderRadius: '6px',
-                          padding: '4px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.18)',
-                          zIndex: 5,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: '.78rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          👤 {booking.customer_name}
-                        </div>
-                        <div style={{ fontSize: '.7rem', opacity: 0.92, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          🕒 {startClock} – {endClock}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Live Drag-to-Select Preview Box */}
-                    {isDragging && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '4px',
-                          bottom: '4px',
-                          left: `${dragLeftPct}%`,
-                          width: `${dragWidthPct}%`,
-                          background: 'rgba(37, 99, 235, 0.22)',
-                          border: '2px dashed #2563eb',
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 15,
-                          pointerEvents: 'none',
-                          color: '#1d4ed8',
-                          fontWeight: 700,
-                          fontSize: '.74rem',
-                          boxShadow: '0 0 10px rgba(37, 99, 235, 0.2)',
-                        }}
-                      >
-                        {dragDurationText}
-                      </div>
-                    )}
-
-                    {/* Live Cursor Hover Time Indicator */}
-                    {isHovered && !isDragging && (
-                      <>
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            bottom: 0,
-                            left: `${hoverInfo.pct}%`,
-                            width: '2px',
-                            background: '#2563eb',
-                            pointerEvents: 'none',
-                            zIndex: 20,
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '4px',
-                            left: `clamp(10px, ${hoverInfo.pct}%, calc(100% - 65px))`,
-                            transform: 'translateX(-50%)',
-                            background: '#1e293b',
-                            color: '#ffffff',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '.68rem',
-                            fontWeight: 600,
-                            pointerEvents: 'none',
-                            zIndex: 25,
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                          }}
-                        >
-                          {formatClockTime(hoverInfo.min)}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {visibleRooms.map((room) => (
+              <DayScheduleRow
+                key={room.id}
+                room={room}
+                bookings={dayBookingsByRoom.get(room.id) || []}
+                activeTz={activeTz}
+                isHovered={hoverInfo?.roomId === room.id}
+                isDragging={dragState?.roomId === room.id}
+                hoverInfo={hoverInfo}
+                dragState={dragState}
+                onMouseMove={handleTrackMouseMove}
+                onMouseDown={handleTrackMouseDown}
+                onMouseLeave={() => setHoverInfo((prev) => (prev?.roomId === room.id ? null : prev))}
+              />
+            ))}
           </div>
 
           {/* Footer Bar / Instructions */}
