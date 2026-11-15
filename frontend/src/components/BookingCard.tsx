@@ -41,12 +41,26 @@ export default function BookingCard({ booking, onCancelled, timeZone }: Props) {
     }
   };
 
+  const isCancelled = booking.status === 'cancelled';
+
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1rem', boxShadow: 'var(--shadow)' }}>
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '1rem',
+        boxShadow: 'var(--shadow)',
+        opacity: isCancelled ? 0.72 : 1,
+        transition: 'opacity .2s ease',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {booking.customer_name}
+            <span style={{ textDecoration: isCancelled ? 'line-through' : 'none' }}>
+              {booking.customer_name}
+            </span>
             <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: '.85rem', marginLeft: '.5rem' }}>
               {booking.customer_email}
             </span>

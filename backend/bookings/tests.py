@@ -136,6 +136,40 @@ class BookingBusinessRuleTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("cannot exceed 24 hours", str(response.data))
 
+    # Test 12: Filter bookings by status=confirmed
+    def test_filter_by_status_confirmed(self):
+        confirmed = self._seed_booking(10, 11)
+        cancelled = Booking.objects.create(
+            room=self.room,
+            customer_name="Cancelled User",
+            customer_email="cancelled@example.com",
+            start_time=make_dt(12),
+            end_time=make_dt(13),
+            status=Booking.Status.CANCELLED,
+        )
+        response = self.client.get(f"{self.base_url}?status=confirmed")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = [b["id"] for b in response.data]
+        self.assertIn(confirmed.id, returned_ids)
+        self.assertNotIn(cancelled.id, returned_ids)
+
+    # Test 13: Filter bookings by status=cancelled
+    def test_filter_by_status_cancelled(self):
+        confirmed = self._seed_booking(10, 11)
+        cancelled = Booking.objects.create(
+            room=self.room,
+            customer_name="Cancelled User",
+            customer_email="cancelled@example.com",
+            start_time=make_dt(12),
+            end_time=make_dt(13),
+            status=Booking.Status.CANCELLED,
+        )
+        response = self.client.get(f"{self.base_url}?status=cancelled")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = [b["id"] for b in response.data]
+        self.assertIn(cancelled.id, returned_ids)
+        self.assertNotIn(confirmed.id, returned_ids)
+
 
 
 

@@ -33,6 +33,9 @@ class BookingViewSet(viewsets.GenericViewSet):
         room_id = request.query_params.get('room')
         if room_id:
             qs = qs.filter(room_id=room_id)
+        status_param = request.query_params.get('status')
+        if status_param in [Booking.Status.CONFIRMED, Booking.Status.CANCELLED]:
+            qs = qs.filter(status=status_param)
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 

@@ -75,8 +75,11 @@ export async function fetchRoom(id: number): Promise<Room> {
 
 // ── Bookings ───────────────────────────────────────────────────────────────
 
-export async function fetchBookings(roomId?: number): Promise<Booking[]> {
-  const query = roomId != null ? `?room=${roomId}` : '';
+export async function fetchBookings(roomId?: number, status?: 'confirmed' | 'cancelled'): Promise<Booking[]> {
+  const qs = new URLSearchParams();
+  if (roomId != null) qs.set('room', String(roomId));
+  if (status) qs.set('status', status);
+  const query = qs.toString() ? `?${qs}` : '';
   const { data } = await request<Booking[]>(`/bookings/${query}`);
   return data;
 }
