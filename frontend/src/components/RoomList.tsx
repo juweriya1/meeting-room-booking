@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchRooms } from '../api';
 import type { Room } from '../types';
 import type { ApiError } from '../types';
@@ -16,13 +16,15 @@ export default function RoomList({ selectedRoom, onSelectRoom, onBookRoom }: Pro
   const [error, setError]       = useState<string | null>(null);
   const [search, setSearch]     = useState('');
   const [capacity, setCapacity] = useState('');
+  const isInitial = useRef(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Only set loading true on initial load so filtering doesn't flicker/unmount existing cards
+    if (isInitial.current) setLoading(true);
     setError(null);
     try {
       const data = await fetchRooms({
-        search: search || undefined,
+        search: search.trim() || undefined,
         capacity: capacity ? Number(capacity) : undefined,
       });
       setRooms(data);
@@ -33,7 +35,17 @@ export default function RoomList({ selectedRoom, onSelectRoom, onBookRoom }: Pro
     }
   }, [search, capacity]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (isInitial.current) {
+      void load();
+      isInitial.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void load();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -57,19 +69,21 @@ export default function RoomList({ selectedRoom, onSelectRoom, onBookRoom }: Pro
         />
       </div>
 
-      {/* Loading */}
-      {loading && <div className="empty-state"><span className="spinner" /> Loading rooms…</div>}
+      {/* Initial Loading */}
+      {loading && rooms.length === 0 && (
+        <div className="empty-state"><span className="spinner" /> Loading rooms…</div>
+      )}
 
       {/* Error */}
-      {!loading && error && <div className="error-banner">⚠️ {error}</div>}
+      {error && <div className="error-banner">⚠️ {error}</div>}
 
-      {/* Empty */}
+      {/* Empty State */}
       {!loading && !error && rooms.length === 0 && (
         <div className="empty-state">No rooms match your filters.</div>
       )}
 
-      {/* Rooms */}
-      {!loading && !error && rooms.map((room) => (
+      {/* Rooms - stays stably mounted during filter changes with zero layout flashing */}
+      {rooms.map((room) => (
         <RoomCard
           key={room.id}
           room={room}
