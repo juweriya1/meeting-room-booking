@@ -6,16 +6,25 @@ import { useState } from 'react';
 interface Props {
   booking: Booking;
   onCancelled: (updated: Booking) => void;
+  timeZone?: string;
 }
 
-function fmtLocal(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
+function fmtDateTime(startIso: string, endIso: string, timeZone?: string): string {
+  const s = new Date(startIso);
+  const e = new Date(endIso);
+  const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const sDate = s.toLocaleDateString(undefined, { timeZone: tz, month: 'short', day: 'numeric', year: 'numeric' });
+  const sTime = s.toLocaleTimeString(undefined, { timeZone: tz, hour: 'numeric', minute: '2-digit' });
+  const eDate = e.toLocaleDateString(undefined, { timeZone: tz, month: 'short', day: 'numeric', year: 'numeric' });
+  const eTime = e.toLocaleTimeString(undefined, { timeZone: tz, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
+  if (sDate === eDate) {
+    return `${sDate}, ${sTime} – ${eTime}`;
+  }
+  return `${sDate} ${sTime} – ${eDate} ${eTime}`;
 }
 
-export default function BookingCard({ booking, onCancelled }: Props) {
+export default function BookingCard({ booking, onCancelled, timeZone }: Props) {
   const [cancelling, setCancelling] = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
@@ -42,8 +51,11 @@ export default function BookingCard({ booking, onCancelled }: Props) {
               {booking.customer_email}
             </span>
           </div>
-          <div style={{ color: 'var(--muted)', fontSize: '.85rem', marginTop: '.25rem' }}>
-            🏢 {booking.room.name} &nbsp;·&nbsp; {fmtLocal(booking.start_time)} – {fmtLocal(booking.end_time)}
+          <div
+            style={{ color: 'var(--muted)', fontSize: '.85rem', marginTop: '.25rem' }}
+            title={`UTC Time: ${booking.start_time} to ${booking.end_time}`}
+          >
+            🏢 {booking.room.name} &nbsp;·&nbsp; 🕒 {fmtDateTime(booking.start_time, booking.end_time, timeZone)}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>

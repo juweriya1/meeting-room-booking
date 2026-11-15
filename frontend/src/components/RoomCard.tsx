@@ -23,7 +23,14 @@ export default function RoomCard({ room, isSelected, onSelect, onBook }: Props) 
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem' }}>
         <div>
-          <div style={{ fontWeight: 600 }}>{room.name}</div>
+          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            {room.name}
+            {isSelected && (
+              <span style={{ fontSize: '.7rem', background: '#dbeafe', color: 'var(--primary)', padding: '.15rem .45rem', borderRadius: '999px', fontWeight: 500 }}>
+                Selected
+              </span>
+            )}
+          </div>
           <div style={{ color: 'var(--muted)', fontSize: '.85rem', marginTop: '.2rem' }}>
             📍 {room.location}
           </div>

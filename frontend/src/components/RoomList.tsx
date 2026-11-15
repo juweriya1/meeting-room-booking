@@ -47,10 +47,10 @@ export default function RoomList({ selectedRoom, onSelectRoom, onBookRoom }: Pro
         />
         <input
           type="number"
-          placeholder="Min capacity"
+          placeholder="Seats needed"
           value={capacity}
           onChange={(e) => setCapacity(e.target.value)}
-          aria-label="Minimum capacity"
+          aria-label="Seats needed"
           style={{ width: '130px', flexShrink: 0 }}
           min={1}
         />

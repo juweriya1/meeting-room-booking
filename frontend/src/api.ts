@@ -7,6 +7,27 @@ import type { Room, Booking, BookingPayload, ApiError } from './types';
 
 const BASE = '/api';
 
+function parseErrorDetail(payload: unknown, status: number): string {
+  if (typeof payload === 'string' && payload.trim()) return payload;
+  if (typeof payload === 'object' && payload !== null) {
+    const p = payload as Record<string, unknown>;
+    if (typeof p.error === 'string') return p.error;
+    if (typeof p.detail === 'string') return p.detail;
+
+    // Handle DRF serializer validation errors: { field_name: ["error msg"] }
+    const fieldErrors = Object.entries(p)
+      .map(([field, msgs]) => {
+        const text = Array.isArray(msgs) ? msgs.join(', ') : String(msgs);
+        const label = field === 'non_field_errors' ? '' : `${field.replace('_', ' ')}: `;
+        return `${label}${text}`;
+      })
+      .filter(Boolean);
+
+    if (fieldErrors.length > 0) return fieldErrors.join(' | ');
+  }
+  return `HTTP ${status}`;
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit,
@@ -25,12 +46,7 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    // Surface structured error message if present
-    const payload = data as Record<string, unknown>;
-    const detail =
-      (typeof payload?.error === 'string' ? payload.error : null) ??
-      (typeof payload?.detail === 'string' ? payload.detail : null) ??
-      `HTTP ${res.status}`;
+    const detail = parseErrorDetail(data, res.status);
     const err: ApiError = { status: res.status, detail };
     throw err;
   }

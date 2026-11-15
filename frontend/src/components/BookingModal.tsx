@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { fetchRoom, createBooking } from '../api';
-import type { Room, ApiError } from '../types';
+import { parseDateTimeInZone } from '../types';
+import type { Room, Booking, ApiError } from '../types';
 
 interface Props {
   roomId: number;
   onClose: () => void;
+  onBookingCreated?: (booking: Booking) => void;
+  timeZone?: string;
 }
 
 interface FormState {
@@ -16,7 +19,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { customer_name: '', customer_email: '', start_time: '', end_time: '' };
 
-export default function BookingModal({ roomId, onClose }: Props) {
+export default function BookingModal({ roomId, onClose, onBookingCreated, timeZone }: Props) {
   const [room, setRoom]           = useState<Room | null>(null);
   const [roomErr, setRoomErr]     = useState<string | null>(null);
   const [form, setForm]           = useState<FormState>(EMPTY_FORM);
@@ -24,6 +27,7 @@ export default function BookingModal({ roomId, onClose }: Props) {
   const [submitting, setSubmitting]   = useState(false);
   const [apiError, setApiError]       = useState<{ status: number; detail: string } | null>(null);
   const [success, setSuccess]         = useState(false);
+  const activeTz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   useEffect(() => {
     fetchRoom(roomId)
@@ -37,10 +41,23 @@ export default function BookingModal({ roomId, onClose }: Props) {
     if (!form.customer_email.trim()) errs.customer_email = 'Email is required.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.customer_email))
       errs.customer_email = 'Enter a valid email.';
-    if (!form.start_time) errs.start_time = 'Start time is required.';
-    if (!form.end_time)   errs.end_time   = 'End time is required.';
-    if (form.start_time && form.end_time && form.start_time >= form.end_time)
-      errs.end_time = 'End must be after start.';
+    if (!form.start_time) {
+      errs.start_time = 'Start time is required.';
+    } else {
+      try {
+        const utcStart = parseDateTimeInZone(form.start_time, activeTz);
+        if (new Date(utcStart).getTime() <= Date.now()) {
+          errs.start_time = 'Start time must be in the future.';
+        }
+      } catch {
+        errs.start_time = 'Please enter a valid start time.';
+      }
+    }
+    if (!form.end_time) {
+      errs.end_time = 'End time is required.';
+    } else if (form.start_time && form.start_time >= form.end_time) {
+      errs.end_time = 'End time must be strictly after start time.';
+    }
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -57,14 +74,15 @@ export default function BookingModal({ roomId, onClose }: Props) {
     setSubmitting(true);
     setApiError(null);
     try {
-      await createBooking({
+      const created = await createBooking({
         room: roomId,
         customer_name: form.customer_name,
         customer_email: form.customer_email,
-        start_time: new Date(form.start_time).toISOString(),
-        end_time: new Date(form.end_time).toISOString(),
+        start_time: parseDateTimeInZone(form.start_time, activeTz),
+        end_time: parseDateTimeInZone(form.end_time, activeTz),
       });
       setSuccess(true);
+      onBookingCreated?.(created);
     } catch (err) {
       setApiError(err as ApiError);
     } finally {
@@ -128,6 +146,9 @@ export default function BookingModal({ roomId, onClose }: Props) {
             {field('Your Email', 'customer_email', 'email')}
             {field('Start Time', 'start_time', 'datetime-local')}
             {field('End Time', 'end_time', 'datetime-local')}
+            <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>
+              🌐 Times are entered in <strong>{activeTz}</strong> and stored in UTC.
+            </div>
             <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.25rem' }}>
               <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={submitting}>
