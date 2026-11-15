@@ -170,6 +170,17 @@ class BookingBusinessRuleTests(APITestCase):
         self.assertIn(cancelled.id, returned_ids)
         self.assertNotIn(confirmed.id, returned_ids)
 
+    # Test 14: Cancelling an already-cancelled booking → 400 Bad Request
+    def test_cancel_already_cancelled_booking_rejected(self):
+        booking = self._seed_booking(10, 11)
+        resp1 = self.client.patch(self.cancel_url(booking.pk), format="json")
+        self.assertEqual(resp1.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp1.data["status"], "cancelled")
+
+        resp2 = self.client.patch(self.cancel_url(booking.pk), format="json")
+        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already cancelled", str(resp2.data))
+
 
 
 
