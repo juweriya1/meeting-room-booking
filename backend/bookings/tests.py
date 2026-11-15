@@ -1,5 +1,5 @@
 from django.utils import timezone
-from rest_framework.test import APITestCase, APIClient
+from rest_framework.test import APITestCase, APITransactionTestCase, APIClient
 from rest_framework import status
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
@@ -82,6 +82,31 @@ class BookingBusinessRuleTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+
+
+class BookingConcurrencyTests(APITransactionTestCase):
+    """
+    Uses APITransactionTestCase so that setUp data is committed to the real
+    database and is visible to worker threads (which open their own connections).
+    All assertions are identical to the original Test 6 specification.
+    """
+
+    def setUp(self):
+        self.room = Room.objects.create(
+            name="Concurrency Room", location="Floor 2", capacity=10
+        )
+        self.base_url = "/api/bookings/"
+
+    def _payload(self, start_hour, end_hour, days_ahead=1, start_minute=0, end_minute=0):
+        return {
+            "room": self.room.pk,
+            "customer_name": "Jane Doe",
+            "customer_email": "jane@example.com",
+            "start_time": make_dt(start_hour, minute=start_minute, days_ahead=days_ahead).isoformat(),
+            "end_time": make_dt(end_hour, minute=end_minute, days_ahead=days_ahead).isoformat(),
+        }
 
     # Test 6: 3 concurrent requests for same slot → exactly 1×201, 2×409
     def test_concurrent_booking_race_condition(self):
