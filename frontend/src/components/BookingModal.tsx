@@ -76,6 +76,17 @@ export default function BookingModal({
     end_time: defaultTimes.end,
   }));
 
+  const currentDurationMins = useMemo(() => {
+    if (!form.start_time || !form.end_time) return null;
+    try {
+      const s = new Date(parseDateTimeInZone(form.start_time, activeTz)).getTime();
+      const e = new Date(parseDateTimeInZone(form.end_time, activeTz)).getTime();
+      return Math.round((e - s) / (60 * 1000));
+    } catch {
+      return null;
+    }
+  }, [form.start_time, form.end_time, activeTz]);
+
   useEffect(() => {
     fetchRoom(roomId)
       .then(setRoom)
@@ -186,7 +197,7 @@ export default function BookingModal({
 
   const field = (label: string, name: keyof FormState, type = 'text', step?: string, min?: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
-      <label style={{ fontSize: '.85rem', fontWeight: 500 }}>{label}</label>
+      <label style={{ fontSize: '.84rem', fontWeight: 600, color: 'var(--text)' }}>{label}</label>
       <input
         name={name}
         type={type}
@@ -194,24 +205,29 @@ export default function BookingModal({
         min={min}
         value={form[name]}
         onChange={handleChange}
-        style={{ borderColor: fieldErrors[name] ? 'var(--danger)' : undefined }}
+        style={{
+          borderColor: fieldErrors[name] ? 'var(--danger)' : undefined,
+          background: 'var(--bg)',
+          padding: '.5rem .75rem',
+          fontSize: '.88rem',
+        }}
       />
       {fieldErrors[name] && <span style={{ color: 'var(--danger)', fontSize: '.8rem' }}>{fieldErrors[name]}</span>}
     </div>
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '1.5rem', width: '100%', maxWidth: '460px', boxShadow: '0 20px 60px rgba(0,0,0,.2)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: 'var(--surface)', borderRadius: '12px', padding: '1.6rem', width: '100%', maxWidth: '480px', boxShadow: '0 24px 64px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.1rem' }}>Book a Room</h2>
-          <button className="btn-ghost" style={{ padding: '.2rem .5rem' }} onClick={onClose}>✕</button>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Book a Room</h2>
+          <button className="btn-ghost" style={{ padding: '.2rem .5rem', fontSize: '.9rem' }} onClick={onClose}>✕</button>
         </div>
 
         {roomErr && <div className="error-banner">⚠️ {roomErr}</div>}
         {room && (
-          <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', fontSize: '.9rem' }}>
-            <strong>{room.name}</strong> &nbsp;·&nbsp; 📍 {room.location} &nbsp;·&nbsp; 👥 {room.capacity}
+          <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', fontSize: '.88rem', border: '1px solid var(--border)' }}>
+            <strong>{room.name}</strong> &nbsp;·&nbsp; 📍 {room.location} &nbsp;·&nbsp; 👥 {room.capacity} seats
           </div>
         )}
 
@@ -232,30 +248,46 @@ export default function BookingModal({
             <button className="btn-primary" onClick={onClose}>Close</button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }} noValidate>
-            {field('Your Name', 'customer_name')}
-            {field('Your Email', 'customer_email', 'email')}
-            {field('Start Time', 'start_time', 'datetime-local', '900', defaultTimes.start)}
-            {field('End Time', 'end_time', 'datetime-local', '900', form.start_time || defaultTimes.start)}
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '.9rem' }} noValidate>
+            {field('👤 Your Name', 'customer_name')}
+            {field('✉️ Your Email', 'customer_email', 'email')}
 
-            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 500 }}>Quick duration:</span>
-              {[15, 30, 45, 60, 90, 120].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setDurationMinutes(m)}
-                  style={{ fontSize: '.72rem', padding: '.15rem .45rem', borderRadius: '12px', border: '1px solid var(--border)' }}
-                >
-                  {m < 60 ? `${m}m` : m === 60 ? '1h' : `${m / 60}h`}
-                </button>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+              {field('🕒 Start Time', 'start_time', 'datetime-local', '900', defaultTimes.start)}
+              {field('🕒 End Time', 'end_time', 'datetime-local', '900', form.start_time || defaultTimes.start)}
             </div>
 
-            <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>
+            <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 500 }}>Quick duration:</span>
+              {[15, 30, 45, 60, 90, 120].map((m) => {
+                const isActive = currentDurationMins === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => setDurationMinutes(m)}
+                    style={{
+                      fontSize: '.72rem',
+                      padding: '.15rem .5rem',
+                      borderRadius: '12px',
+                      background: isActive ? 'var(--primary)' : 'transparent',
+                      color: isActive ? '#ffffff' : 'var(--text)',
+                      borderColor: isActive ? 'var(--primary)' : 'var(--border)',
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all .15s ease',
+                    }}
+                  >
+                    {m < 60 ? `${m}m` : m === 60 ? '1h' : `${m / 60}h`}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ fontSize: '.78rem', color: 'var(--muted)', background: 'var(--bg)', padding: '.45rem .75rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
               🌐 Times are entered in <strong>{getTimezoneDisplayInfo(activeTz).label}</strong> and stored in UTC.
             </div>
+
             <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.25rem' }}>
               <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={submitting}>
